@@ -510,10 +510,18 @@
   function getResult(rotation) {
     const count = items.length;
     const slice = (2 * Math.PI) / count;
-    // Pointer is at top (-PI/2). Normalize rotation.
-    let angle = (-rotation + Math.PI / 2) % (2 * Math.PI);
-    if (angle < 0) angle += 2 * Math.PI;
-    const idx = Math.floor(angle / slice) % count;
+    // Pointer is at top (-PI/2). DrawWheel draws slice i from (rotation + i*slice - PI/2) to (rotation + i*slice - PI/2 + slice).
+    // The pointer at -PI/2 means we need: pointerAngle = -PI/2
+    // Convert rotation to find which slice covers -PI/2:
+    // slice i covers [rotation + i*slice - PI/2, rotation + i*slice - PI/2 + slice)
+    // So: rotation + i*slice - PI/2 <= -PI/2 < rotation + i*slice - PI/2 + slice
+    // => i*slice <= -rotation < i*slice + slice
+    // => i <= -rotation/slice < i + 1
+    // => i = floor(-rotation / slice)
+    // Handle negative: we want positive modulo
+    let rawIdx = -rotation / slice;
+    let idx = Math.floor(rawIdx) % count;
+    if (idx < 0) idx += count;
     return idx;
   }
 
