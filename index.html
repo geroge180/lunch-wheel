@@ -296,6 +296,56 @@
     text-align: center;
   }
 
+  .edit-emoji {
+    font-size: 22px;
+    width: 44px;
+    padding: 6px 2px;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+    appearance: auto;
+    -webkit-appearance: auto;
+    background: white;
+  }
+
+  .edit-del {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .edit-del:hover {
+    color: #f5576c;
+    background: rgba(245, 87, 108, 0.1);
+  }
+
+  .btn-add {
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px;
+    border: 2px dashed #ddd;
+    border-radius: 12px;
+    background: transparent;
+    font-size: 14px;
+    color: #999;
+    cursor: pointer;
+    font-family: 'Noto Sans SC', sans-serif;
+    transition: all 0.2s;
+  }
+
+  .btn-add:hover {
+    border-color: #f5576c;
+    color: #f5576c;
+    background: rgba(245, 87, 108, 0.04);
+  }
+
   .edit-item {
     display: flex;
     align-items: center;
@@ -354,6 +404,18 @@
     #wheel { width: 280px; height: 280px; }
     .header h1 { font-size: 26px; }
     .btn { padding: 12px 28px; font-size: 16px; }
+    .edit-modal { padding: 24px 20px; }
+    .edit-emoji { width: 38px; font-size: 18px; }
+  }
+
+  @media (max-width: 380px) {
+    #wheel { width: 240px; height: 240px; }
+    .container { padding: 16px 12px; border-radius: 24px; }
+    .header h1 { font-size: 22px; }
+    .header p { font-size: 12px; }
+    .btn { padding: 10px 20px; font-size: 14px; }
+    .edit-item { flex-wrap: wrap; gap: 6px; }
+    .edit-item input[type="text"] { min-width: 120px; }
   }
 </style>
 </head>
@@ -397,6 +459,7 @@
   <div class="edit-modal">
     <h2>✏️ 编辑今日菜单</h2>
     <div id="editList"></div>
+    <button class="btn-add" onclick="addItem()">＋ 添加菜品</button>
     <div class="edit-actions">
       <button class="btn btn-cancel" onclick="closeEdit()">取消</button>
       <button class="btn btn-save" onclick="saveEdit()">保存</button>
@@ -411,7 +474,8 @@
   ];
 
   const DARK_TEXT_COLORS = ['#F7DC6F', '#FFB347', '#82CCDD', '#A68CDE'];
-  const EMOJIS = ['🥟', '🍜', '🥗', '🍱', '🐟', '🍗', '🍜', '🥟'];
+  const EMOJIS = ['🥟', '🍜', '🥗', '🍱', '🐟', '🍗', '🍣', '🥩'];
+  const EMOJI_OPTIONS = ['🥟','🍜','🥗','🍱','🐟','🍗','🍣','🥩','🥘','🍲','🍝','🌮','🌯','🫔','🥪','🧆','🍳','🥓','🍔','🌭','🧁','🍰','🎂','🍨','🍩','🍪','☕','🧋','🥤','🍺','🍷','🥃'];
 
   let items = ['麻辣烫', '牛肉面', '轻食沙拉', '日料定食', '酸菜鱼', '黄焖鸡', '螺蛳粉', '广式茶点'];
   let colors = [...COLORS];
@@ -475,14 +539,19 @@
       ctx.textBaseline = 'middle';
 
       // Emoji
-      ctx.font = 'bold 22px "Noto Sans SC", sans-serif';
-      ctx.fillText(EMOJIS[i % EMOJIS.length], 0, -16);
+      // Emoji
+      ctx.font = 'bold 20px "Noto Sans SC", sans-serif';
+      ctx.fillText(EMOJIS[i % EMOJIS.length], 0, -14);
 
-      // Text
-      ctx.font = 'bold 14px "Noto Sans SC", sans-serif';
+      // Text - auto-size for long names
+      const name = items[i];
+      let fontSize = 14;
+      if (name.length > 4) fontSize = 12;
+      if (name.length > 6) fontSize = 10;
+      ctx.font = 'bold ' + fontSize + 'px "Noto Sans SC", sans-serif';
       const isDark = !DARK_TEXT_COLORS.includes(colors[i % colors.length]) && i % colors.length !== 2;
       ctx.fillStyle = isDark ? '#fff' : '#333';
-      ctx.fillText(items[i], 0, 12);
+      ctx.fillText(name, 0, 12);
 
       ctx.restore();
     }
@@ -510,10 +579,15 @@
   function getResult(rotation) {
     const count = items.length;
     const slice = (2 * Math.PI) / count;
-    // Pointer is at top (-PI/2). Normalize rotation.
-    let angle = (-rotation + Math.PI / 2) % (2 * Math.PI);
-    if (angle < 0) angle += 2 * Math.PI;
-    const idx = Math.floor(angle / slice) % count;
+    // Normalize rotation to [0, 2PI) first, then compute which slice the pointer (at top, -PI/2) falls on.
+    const normalized = ((rotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    // drawWheel draws slice i from [rotation + i*slice - PI/2, rotation + i*slice - PI/2 + slice)
+    // Pointer is at -PI/2 (top). We want: rotation + i*slice - PI/2 <= -PI/2 < rotation + i*slice - PI/2 + slice
+    // => rotation + i*slice <= 0 < rotation + i*slice + slice
+    // With normalized rotation in [0, 2PI): i*slice <= (2PI - normalized) % 2PI < i*slice + slice
+    // Equivalent: the pointer offset clockwise from the first-slice start is (2PI - normalized) % 2PI
+    const offset = ((2 * Math.PI - normalized) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+    const idx = Math.floor(offset / slice) % count;
     return idx;
   }
 
@@ -523,15 +597,18 @@
     const label = document.getElementById('resultLabel');
 
     emoji.textContent = EMOJIS[idx % EMOJIS.length];
-    label.textContent = '今天吃：' + items[idx] + ' 🎉';
+    const hour = new Date().getHours();
+    const mealTime = hour < 11 ? '早餐' : hour < 14 ? '午餐' : hour < 17 ? '下午茶' : '晚餐';
+    label.textContent = mealTime + '吃：' + items[idx] + ' 🎉';
 
     el.classList.add('show');
     startCelebration();
 
     // Add to history
     const now = new Date();
+    const dateStr = now.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
     const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    history.unshift({ item: items[idx], time: timeStr });
+    history.unshift({ item: items[idx], time: dateStr + ' ' + timeStr });
     if (history.length > 50) history = history.slice(0, 50);
     localStorage.setItem('lunchHistory', JSON.stringify(history));
     renderHistory();
@@ -605,6 +682,16 @@
       const div = document.createElement('div');
       div.className = 'edit-item';
 
+      const emojiSelect = document.createElement('select');
+      emojiSelect.className = 'edit-emoji';
+      EMOJI_OPTIONS.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e;
+        opt.textContent = e;
+        if (e === EMOJIS[i % EMOJIS.length]) opt.selected = true;
+        emojiSelect.appendChild(opt);
+      });
+
       const colorInput = document.createElement('input');
       colorInput.type = 'color';
       colorInput.className = 'edit-color';
@@ -617,6 +704,7 @@
       textInput.dataset.idx = i;
       textInput.placeholder = '输入菜名...';
 
+      div.appendChild(emojiSelect);
       div.appendChild(colorInput);
       div.appendChild(textInput);
       list.appendChild(div);
@@ -632,17 +720,26 @@
   function saveEdit() {
     const textInputs = document.querySelectorAll('#editList input[type="text"]');
     const colorInputs = document.querySelectorAll('#editList input[type="color"]');
+    const emojiSelects = document.querySelectorAll('#editList select.edit-emoji');
 
     const newItems = [];
     const newColors = [];
+    const newEmojis = [];
 
     textInputs.forEach((input, i) => {
       const val = input.value.trim();
       if (val) {
         newItems.push(val);
         newColors.push(colorInputs[i].value);
+        newEmojis.push(emojiSelects[i].value);
       }
     });
+
+    // Update EMOJIS to include user's selections
+    for (let i = 0; i < newEmojis.length; i++) {
+      if (i < EMOJIS.length) EMOJIS[i] = newEmojis[i];
+      else EMOJIS.push(newEmojis[i]);
+    }
 
     if (newItems.length < 2) {
       alert('至少需要 2 个菜品！');
@@ -655,6 +752,46 @@
     drawWheel(0);
     document.getElementById('resultText').classList.remove('show');
     closeEdit();
+  }
+
+  function addItem() {
+    const list = document.getElementById('editList');
+    const div = document.createElement('div');
+    div.className = 'edit-item';
+
+    const emojiSelect = document.createElement('select');
+    emojiSelect.className = 'edit-emoji';
+    EMOJI_OPTIONS.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e; opt.textContent = e;
+      emojiSelect.appendChild(opt);
+    });
+
+    // Assign a new color beyond the default palette
+    const usedColors = Array.from(document.querySelectorAll('#editList input[type="color"]')).map(c => c.value);
+    const newColor = '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
+
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.className = 'edit-color';
+    colorInput.value = newColor;
+
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.value = '';
+    textInput.placeholder = '输入菜名...';
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '✕';
+    delBtn.className = 'edit-del';
+    delBtn.onclick = () => div.remove();
+
+    div.appendChild(emojiSelect);
+    div.appendChild(colorInput);
+    div.appendChild(textInput);
+    div.appendChild(delBtn);
+    list.appendChild(div);
+    textInput.focus();
   }
 
   function renderHistory() {
@@ -692,7 +829,7 @@
   function resizeCelebration() {
     cCanvas.width = window.innerWidth * DPR;
     cCanvas.height = window.innerHeight * DPR;
-    cCtx.scale(DPR, DPR);
+    cCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
   window.addEventListener('resize', resizeCelebration);
 
@@ -803,6 +940,8 @@
   // Initialize
   drawWheel(0);
   renderHistory();
+  // Initialize celebration canvas on load (not just on spin)
+  resizeCelebration();
 
   // Close edit modal on overlay click
   document.getElementById('editOverlay').addEventListener('click', (e) => {
