@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🍽️ 中午吃什么</title>
+<title>🍽️ 今天吃什么</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
 
@@ -423,7 +423,7 @@
 
 <div class="container">
   <div class="header">
-    <h1>🍽️ 中午吃什么</h1>
+    <h1>🍽️ 今天吃什么</h1>
     <p>命运的转盘会给你答案</p>
   </div>
 
@@ -598,7 +598,7 @@
 
     emoji.textContent = EMOJIS[idx % EMOJIS.length];
     const hour = new Date().getHours();
-    const mealTime = hour < 11 ? '早餐' : hour < 14 ? '午餐' : hour < 17 ? '下午茶' : '晚餐';
+    const mealTime = '今天';
     label.textContent = mealTime + '吃：' + items[idx] + ' 🎉';
 
     el.classList.add('show');
